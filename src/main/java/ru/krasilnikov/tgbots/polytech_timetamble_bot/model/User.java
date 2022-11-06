@@ -9,14 +9,29 @@ public class User {
 
     @Id
     private Long chatId;
-
     private String firstName;
-
     private String lastName;
-
     private String userName;
     private Timestamp registeredAt;
+    private int groupId;
+    private int role;
+    private boolean isNotice;
 
+    public int getRole() {
+        return role;
+    }
+
+    public void setRole(int role) {
+        this.role = role;
+    }
+
+    public int getGroupId() {
+        return groupId;
+    }
+
+    public void setGroupId(int groupId) {
+        this.groupId = groupId;
+    }
 
     public Long getChatId() {
         return chatId;
@@ -58,6 +73,14 @@ public class User {
         this.registeredAt = registeredAt;
     }
 
+    public boolean isNotice() {
+        return isNotice;
+    }
+
+    public void setNotice(boolean notice) {
+        isNotice = notice;
+    }
+
     @Override
     public String toString() {
         return "User{" +
@@ -66,6 +89,8 @@ public class User {
                 ", lastName='" + lastName + '\'' +
                 ", userName='" + userName + '\'' +
                 ", registeredAt=" + registeredAt +
+                ", groupId=" + groupId +
+                ", role=" + role +
                 '}';
     }
 }
