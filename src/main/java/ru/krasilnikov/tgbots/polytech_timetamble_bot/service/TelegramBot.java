@@ -20,6 +20,7 @@ import java.util.*;
 @Slf4j
 public class TelegramBot extends TelegramLongPollingBot {
 
+    private String filePath = "/home/sasalomka/TimeTableFiles/stable.xlsx";
     ExcelFileReader excelFileReader;
 
     @Autowired
@@ -52,6 +53,11 @@ public class TelegramBot extends TelegramLongPollingBot {
     public TelegramBot(BotConfig config){
         this.config = config;
 
+        try{
+            excelFileReader = new ExcelFileReader(new java.io.File(filePath));
+        }catch (IOException e){
+            System.out.println(e.getMessage());
+        }
     }
 
     @Override
@@ -268,20 +274,18 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void uploadCommandReceiver(Message message){
-        String fileName = "null";
         Document document = message.getDocument();
 
         GetFile getFile = new GetFile();
         getFile.setFileId(document.getFileId());
         try{
             File file = execute(getFile);
-            fileName = "/home/sasalomka/TimeTableFiles/"+document.getFileName();
-            downloadFile(file, new java.io.File(fileName));
+            downloadFile(file, new java.io.File(filePath));
         }catch (TelegramApiException e){}
 
         sendMessage(message.getChatId(), "Файл принят, начало обработки...");
         try {
-            java.io.File file = new java.io.File("/home/sasalomka/TimeTableFiles/" + document.getFileName());
+            java.io.File file = new java.io.File(filePath);
             excelFileReader = new ExcelFileReader(file); //Чтение excel-файла. Все должно происходить в конструкторе класса, а мы можем просто использовать все паблик функции для работы с файлом
 
             sendMessage(message.getChatId(), "Файл обработан");
@@ -381,7 +385,14 @@ public class TelegramBot extends TelegramLongPollingBot {
                 continue;
             }
 
-            answer += i + " - " + groupTimetable.get(i) + "\n";
+            String[] lesionName = groupTimetable.get(i).split("\s{3,}");
+
+            answer += i + " - ";
+            for(String str : lesionName){
+                str = str.trim();
+                answer += str + " ";
+            }
+            answer += "\n";
         }
 
         return answer;
