@@ -26,10 +26,11 @@ public class TelegramBot extends TelegramLongPollingBot {
     @Autowired
     private UserRepository userRepository;
 
-    final static String VERSION = "0.1";
+    final static String VERSION = "0.1.1";
     final static String VERSION_TXT = "Данные об обновлениях:\n" +
             "\tТекущая версия бота: " + VERSION + "\n" +
             "Нововведения каждой версии:\n" +
+            "\t0.1.1: добавление регулярного выражения для симпатичного вывода" +
             "\t0.1: добавлена подписка на уведомления и собственно уведомления" +
             "\t0.0.5: добавлены: загрузка файла, чтение файла, разделение на юзеров и админов, возможность узнать свое расписание вручную\n" +
             "\t0.0.4: добавлены команды /changegroup и /mygroup\n" +
