@@ -386,12 +386,12 @@ public class TelegramBot extends TelegramLongPollingBot {
                 continue;
             }
 
-            String[] lesionName = groupTimetable.get(i).split("\s{3,}");
+            String[] lesionName = groupTimetable.get(i).split(",");
 
             answer += i + " - ";
             for(String str : lesionName){
                 str = str.trim();
-                answer += str + " ";
+                answer += str + " | ";
             }
             answer += "\n";
         }
