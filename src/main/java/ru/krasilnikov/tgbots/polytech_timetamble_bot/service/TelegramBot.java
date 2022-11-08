@@ -267,9 +267,9 @@ public class TelegramBot extends TelegramLongPollingBot {
         String text = "Ваша роль: ";
 
         switch (role) {
-            case 0 -> sendMessage(chatId, text + "student");
-            case 1 -> sendMessage(chatId, text + "teacher");
-            case 2 -> sendMessage(chatId, text + "admin");
+            case 0 -> sendMessage(chatId, text + "бедолага");
+            case 1 -> sendMessage(chatId, text + "работяга");
+            case 2 -> sendMessage(chatId, text + "гигачад");
         }
         logsUpdate(new Date() + "\tUser: " + chatId + " MYROLE COMMAND");
     }
@@ -380,7 +380,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
         }
 
-        logsUpdate(new Date() + "\tUser: " + chatId + " CUSTOMNOTICE COMMAND;\nNOTICE TEXT: " + message);
+        logsUpdate(new Date() + "\tUser: " + chatId + " CUSTOMNOTICE COMMAND;\n\tNOTICE TEXT: " + message);
     }
     private void feedbackCommandReceiver(Message message, ArrayList<String> feedback){
         String feedbackFilePath = "/home/sasalomka/TimeTableFiles/feedback.txt";
@@ -411,7 +411,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         sendMessage(l, message);
 
-        logsUpdate(new Date() + "\tUser: " + chatId + " SEND PERSONAL NOTICE TO USER: " + l + "\nMESSAGE TEXT: " + message);
+        logsUpdate(new Date() + "\tUser: " + chatId + " SEND PERSONAL NOTICE TO USER: " + l + "\n\tMESSAGE TEXT: " + message);
     }
     private void sendMessage(long chatId, String textToSend){
         SendMessage message = new SendMessage();
@@ -475,7 +475,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     private void logsUpdate(String log){
         try(FileWriter writer = new FileWriter("/home/sasalomka/TimeTableFiles/logs.txt", true)){
 
-            writer.write(log);
+            writer.write(log + "\n");
 
         }catch (IOException e) {
             System.out.println(e.getMessage());
