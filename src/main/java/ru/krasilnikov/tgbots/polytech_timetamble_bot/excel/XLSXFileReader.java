@@ -1,6 +1,7 @@
-package ru.krasilnikov.tgbots.polytech_timetamble_bot.service;
+package ru.krasilnikov.tgbots.polytech_timetamble_bot.excel;
 
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.xssf.usermodel.XSSFCell;
 import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
@@ -14,21 +15,22 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-public class ExcelFileReader{
+public class XLSXFileReader {
 
     private XSSFSheet sheet;
     private XSSFRow row;
     private Map<Integer, Integer> groupMap;
     private ArrayList<Integer> groupIdList;
 
-    public ExcelFileReader(File filePath) throws IOException{
+    public XLSXFileReader(File filePath) throws IOException{
 
         FileInputStream file = new FileInputStream(filePath);
         XSSFWorkbook workbook = new XSSFWorkbook(file);
         sheet = workbook.getSheet("Лист1");
+
         row = sheet.getRow(3);
 
-        groupMap = getGroupMapFromRow(row);
+        groupMap = readGroupInfo(row);
 
         workbook.close();
     }
@@ -39,64 +41,52 @@ public class ExcelFileReader{
 
         int groupColumn = groupMap.get(groupId);
 
-        for (int i = 5, lesionId = 1; i < 20; i++, lesionId++) {
+        int i = 4;
+        int lastRow = 18;
+        boolean isMonday = false;
+        XSSFRow startReadingRow = sheet.getRow(i);
 
-            if(i == 13){
+        Iterator<Cell> cellIterator = startReadingRow.cellIterator();
+        while(cellIterator.hasNext()){
+            Cell cell = cellIterator.next();
+
+            if(cell.getCellType() == CellType.STRING && cell.getStringCellValue().contains("Классный час")){
                 i++;
+                lastRow+=2;
+                isMonday = true;
+                break;
             }
+        }
+
+        for (int lesionId = 1; i < lastRow; i++, lesionId++) {
+
+            if(isMonday && i == 13)
+                i++;
 
             XSSFRow row = sheet.getRow(i);
             XSSFCell cell = row.getCell(groupColumn);
 
             String lesionName = cell.getStringCellValue();
 
-            if(lesionName == "" || lesionName.contains("Классный час")){
+            if(lesionName.equals("") || lesionName.contains("Классный час"))
                 continue;
-            }
 
-            switch (lesionId){
-                case 1:
-                    groupTimetable.put(1, lesionName);
-                    break;
-                case 2:
-                    groupTimetable.put(1, lesionName);
-                    break;
-                case 3:
-                    groupTimetable.put(2, lesionName);
-                    break;
-                case 4:
-                    groupTimetable.put(2, lesionName);
-                    break;
-                case 5:
-                    groupTimetable.put(3, lesionName);
-                    break;
-                case 6:
-                    groupTimetable.put(3, lesionName);
-                    break;
-                case 7:
-                    groupTimetable.put(4, lesionName);
-                    break;
-                case 8:
-                    groupTimetable.put(4, lesionName);
-                    break;
-                case 9:
-                    groupTimetable.put(5, lesionName);
-                    break;
-                case 10:
-                    groupTimetable.put(5, lesionName);
-                    break;
-                case 11:
-                    groupTimetable.put(6, lesionName);
-                    break;
-                case 12:
-                    groupTimetable.put(6, lesionName);
-                    break;
-                case 13:
-                    groupTimetable.put(7, lesionName);
-                    break;
-                case 14:
-                    groupTimetable.put(7, lesionName);
-                    break;
+
+            switch (lesionId) {
+                case 1 -> groupTimetable.put(1, lesionName);
+                case 2 -> groupTimetable.put(1, lesionName);
+                case 3 -> groupTimetable.put(2, lesionName);
+                case 4 -> groupTimetable.put(2, lesionName);
+                case 5 -> groupTimetable.put(3, lesionName);
+                case 6 -> groupTimetable.put(3, lesionName);
+                case 7 -> groupTimetable.put(4, lesionName);
+                case 8 -> groupTimetable.put(4, lesionName);
+                case 9 -> groupTimetable.put(5, lesionName);
+                case 10 -> groupTimetable.put(5, lesionName);
+                case 11 -> groupTimetable.put(6, lesionName);
+                case 12 -> groupTimetable.put(6, lesionName);
+                case 13 -> groupTimetable.put(7, lesionName);
+                case 14 -> groupTimetable.put(7, lesionName);
             }
 
         }
@@ -104,7 +94,7 @@ public class ExcelFileReader{
         return groupTimetable;
     }
 
-    private Map<Integer, Integer> getGroupMapFromRow(XSSFRow row){
+    private Map<Integer, Integer> readGroupInfo(XSSFRow row){
 
         Map<Integer, Integer> groupMap = new HashMap<>();
         ArrayList<Integer> groupList = new ArrayList<>();

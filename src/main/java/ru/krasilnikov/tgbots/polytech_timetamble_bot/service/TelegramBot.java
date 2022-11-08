@@ -9,9 +9,12 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.krasilnikov.tgbots.polytech_timetamble_bot.config.BotConfig;
+import ru.krasilnikov.tgbots.polytech_timetamble_bot.excel.XLSXFileReader;
 import ru.krasilnikov.tgbots.polytech_timetamble_bot.model.User;
 import ru.krasilnikov.tgbots.polytech_timetamble_bot.model.UserRepository;
 
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.Timestamp;
 import java.util.*;
@@ -19,58 +22,60 @@ import java.util.*;
 @Component
 @Slf4j
 public class TelegramBot extends TelegramLongPollingBot {
-
-    private String filePath = "/home/sasalomka/TimeTableFiles/stable.xlsx";
-    ExcelFileReader excelFileReader;
-
+    private final String lastFilePath = "/home/sasalomka/TimeTableFiles/last_file.txt";
+    XLSXFileReader excelFileReader;
     @Autowired
     private UserRepository userRepository;
-
-    final static String VERSION = "0.1.1";
+    final static String VERSION = "0.1.2";
+    final static String SPECIAL_THANKS = "Отдельная благодарность: \n" +
+            "@FTP0N1Y";
     final static String VERSION_TXT = "Данные об обновлениях:\n" +
             "\tТекущая версия бота: " + VERSION + "\n" +
             "Нововведения каждой версии:\n" +
-            "\t0.1.1: добавление регулярного выражения для симпатичного вывода" +
-            "\t0.1: добавлена подписка на уведомления и собственно уведомления" +
+            "\t0.1.2: добавление фидбека /feedback\n" +
+            "\t0.1.1: добавление регулярного выражения для симпатичного вывода\n" +
+            "\t0.1: добавлена подписка на уведомления и собственно уведомления\n" +
             "\t0.0.5: добавлены: загрузка файла, чтение файла, разделение на юзеров и админов, возможность узнать свое расписание вручную\n" +
             "\t0.0.4: добавлены команды /changegroup и /mygroup\n" +
             "\t0.0.3: добавлена поддержка СУБД MySql\n" +
             "\t0.0.2: добавлено выпадающее меню с доступными командами.\n" +
-            "\t0.0.1: добавлены 2 команды: /start и /help.";
-    final static String HELP_TXT = "Доступные команды:\n" +
-            "\t/help - список доступных команд\n" +
-            "\t/version - информация о версиях бота\n" +
-            "\t/changegroup номер_группы - подписаться на уведомления по расписанию для вашей группы\n" +
-            "\t/mygroup - узнать свою текущую группу\n" +
-            "\t/myrole - узнать свою роль\n" +
-            "\t/timetable - узнать расписание своей группы" +
-            "\t/notice[admin] - оповестить о расписании" +
-            "\t/customnotice сообщение_без_пробелов[admin] - Совершить рассылку всем пользователям\n\n" +
-            "При обнаружении багов, или если есть какие-либо пожелания, то пишите мне в тг:\n@Sasalomka";
+            "\t0.0.1: добавлены 2 команды: /start и /help.\n\n" +
+            "Отдельные благодарности: ";
+    final static String HELP_TXT = """
+            Внимание! Если бот вдруг не работает как надо, то возможно вас еще нет в базе. Чтобы зарегистрироваться, отправьте команду /start
+
+            Доступные команды:
+            \t/help - список доступных команд
+            \t/versions - информация о версиях бота
+            \t/changegroup [номер_группы] (напр. /changegroup 71)- подписаться на уведомления по расписанию для вашей группы
+            \t/mygroup - узнать свою текущую группу
+            \t/myrole - узнать свою роль
+            \t/timetable - узнать расписание своей группы
+            \t/feedback [ваши любые пожелания или опыт использования] - Опишите опыт использования ботом.\t/thanks
+
+            Бот хостится на моем компе, поэтому по очевидным причинам иногда будет недоступен, но если он будет уж очень всем полезен и нужен, то так и быть, раскошелюсь на сервер, только скажите
+
+            При обнаружении багов, или если есть какие-либо пожелания, то пишите в /feedback или мне в тг:
+            @Sasalomka""";
 
     final BotConfig config;
-
-
     public TelegramBot(BotConfig config){
         this.config = config;
 
         try{
-            excelFileReader = new ExcelFileReader(new java.io.File(filePath));
+            excelFileReader = new XLSXFileReader(new java.io.File(checkLastFile()));
         }catch (IOException e){
             System.out.println(e.getMessage());
         }
     }
-
     @Override
     public String getBotUsername() {
         return config.getBotName();
     }
-
     @Override
     public String getBotToken() {
         return config.getToken();
     }
-
     /**
      *
      * Обработка апдейтов
@@ -93,14 +98,17 @@ public class TelegramBot extends TelegramLongPollingBot {
                 case "/help":
                     helpCommandReceived(chatId);
                     break;
-                case "/version":
+                case "/versions":
                     versionCommandReceived(chatId);
+                    break;
+                case "/thanks":
+                    thanksCommandReceiver(chatId);
                     break;
                 case "/changegroup":
                     if(messageText.length == 2) {
                         String stringGroupId = messageText[1];
 
-                        chooseGroupCommandReceiver(update.getMessage(), stringGroupId);
+                        changeGroupCommandReceiver(update.getMessage(), stringGroupId);
                     }
                     else{
                         sendMessage(update.getMessage().getChatId(), "Используйте шаблон /changegroup [номер группы]");
@@ -131,13 +139,44 @@ public class TelegramBot extends TelegramLongPollingBot {
                     autoNoticeCommandReceiver(chatId);
                     break;
                 case "/customnotice":
+
                     if(getRole(update.getMessage().getChatId()) == 2) {
-                        customNoticeCommandReceiver(messageText[1]);
+                        boolean isSub = false;
+                        ArrayList<String> message = new ArrayList<>();
+                        for (int i = 2; i < messageText.length; i++) {
+                            message.add(messageText[i]);
+                        }
+
+                        if(messageText[1].equalsIgnoreCase("y"))
+                            isSub = true;
+
+                        customNoticeCommandReceiver(message, isSub);
                     } else{
                         sendMessage(update.getMessage().getChatId(), "Недостаточно прав");
                     }
                     break;
+                case "/feedback":
+                    if(messageText.length == 1)
+                        break;
 
+                    ArrayList<String> feedback = new ArrayList<>();
+                    for (int i = 1; i < messageText.length; i++) {
+                        feedback.add(messageText[i]);
+                    }
+                    feedbackCommandReceiver(update.getMessage(), feedback);
+                    break;
+
+                case "/personalnotice":
+                    if(getRole(update.getMessage().getChatId()) == 2) {
+                        ArrayList<String> message = new ArrayList<>();
+                        for (int i = 1; i < messageText.length; i++) {
+                            message.add(messageText[i]);
+                        }
+                        personalNoticeCommandReceiver(messageText[1], message);
+                    }else{
+                        sendMessage(update.getMessage().getChatId(), "Недостаточно прав");
+                    }
+                    break;
                 default:
                     sendMessage(chatId, "Простите, эта команда неправильна, или не поддерживается.");
             }
@@ -146,13 +185,6 @@ public class TelegramBot extends TelegramLongPollingBot {
             uploadCommandReceiver(update.getMessage());
         }
     }
-
-    /**
-     *
-     * Регистрация юзера, если он вызвал команду /start впервые
-     *
-     * @param msg
-     */
     private void registerUser(Message msg) {
 
         if(userRepository.findById(msg.getChatId()).isEmpty()){
@@ -172,14 +204,6 @@ public class TelegramBot extends TelegramLongPollingBot {
             log.info("User saved: " + user);
         }
     }
-
-    /**
-     *
-     * Обработка команды /start
-     *
-     * @param chatId
-     * @param name
-     */
     private void startCommandReceived(long chatId, String name){
         String answer = "Привет, " + name + ", будем знакомы!\n" +
                 "Скоро ты сможешь смотреть расписание в нашем ЗАМЕЧАТЕЛЬНОМ КОЛЛЕДЖЕ\n\n" +
@@ -189,40 +213,20 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         sendMessage(chatId, answer);
     }
-
-
-    /**
-     *
-     * Обработка команды /help
-     *
-     * @param chatId
-     */
     private void helpCommandReceived(long chatId){
         sendMessage(chatId, HELP_TXT);
         log.info("ChatID: " + chatId + " called /help");
     }
-
-    /**
-     *
-     * Обработка команды /version
-     *
-     * @param chatId
-     */
     private void versionCommandReceived(long chatId){
         sendMessage(chatId, VERSION_TXT);
         log.info("ChatID: " + chatId + " called /version");
     }
+    private void thanksCommandReceiver(long chatId){
+        sendMessage(chatId, SPECIAL_THANKS);
+    }
+    private void changeGroupCommandReceiver(Message msg, String stringGroupId){
 
-    /**
-     *
-     * Функция отвечает за изменение/выбор группы юзера
-     *
-     * @param msg
-     * @param stringGroupId
-     */
-    private void chooseGroupCommandReceiver(Message msg, String stringGroupId){
-
-        int intGroupId = -1;
+        int intGroupId = 0;
         try {
             intGroupId = Integer.parseInt(stringGroupId);
         }catch (Exception e){
@@ -231,70 +235,80 @@ public class TelegramBot extends TelegramLongPollingBot {
             return;
         }
 
-        Optional<User> optionalUser = userRepository.findById(msg.getChatId());
+        ArrayList<Integer> groupList = excelFileReader.getGroupIdList();
 
-        User user = optionalUser.get();
+        for(int i : groupList){
+            if(intGroupId == i){
+                Optional<User> optionalUser = userRepository.findById(msg.getChatId());
 
-        user.setGroupId(intGroupId);
+                User user = optionalUser.get();
 
-        userRepository.save(user);
+                user.setGroupId(intGroupId);
 
-        sendMessage(msg.getChatId(), "Ваша группа успешно изменена.");
+                userRepository.save(user);
 
-        log.info("ChatID: " + msg.getChatId() + " called /chooseGroup");
+                sendMessage(msg.getChatId(), "Ваша группа успешно изменена.");
+                return;
+            }
+        }
+        sendMessage(msg.getChatId(), "Такой группы не найдено, проверьте корректность введенных данных");
     }
-
     private void myGroupCommandReceiver(long chatId){
 
         Optional<User> optionalUser = userRepository.findById(chatId);
         User user = optionalUser.get();
 
-        sendMessage(chatId, "Номер вашей группы: " + user.getGroupId());
-
+        if(user.getGroupId() == 0){
+            sendMessage(chatId, "Вы еще не выбрали свою группуб используйте /changegroup [номер группы] для выбора своей группы");
+        }
+        else {
+            sendMessage(chatId, "Номер вашей группы: " + user.getGroupId());
+        }
         log.info("ChatID: " + chatId + " called /myGroup");
     }
-
     private void myRoleCommandReceiver(long chatId){
 
         int role = getRole(chatId);
 
         String text = "Ваша роль: ";
 
-        switch (role){
-            case 0:
-                sendMessage(chatId, text + "student");
-                break;
-            case 1:
-                sendMessage(chatId, text + "teacher");
-                break;
-            case 2:
-                sendMessage(chatId, text + "admin");
-                break;
+        switch (role) {
+            case 0 -> sendMessage(chatId, text + "student");
+            case 1 -> sendMessage(chatId, text + "teacher");
+            case 2 -> sendMessage(chatId, text + "admin");
         }
         log.info("ChatID: " + chatId + " called /myRole");
     }
-
     private void uploadCommandReceiver(Message message){
         Document document = message.getDocument();
 
         GetFile getFile = new GetFile();
         getFile.setFileId(document.getFileId());
+        String filePath = "/home/sasalomka/TimeTableFiles/";
         try{
             File file = execute(getFile);
-            downloadFile(file, new java.io.File(filePath));
-        }catch (TelegramApiException e){}
+
+            String[] docName = document.getFileName().split("\\.");
+            if(docName.length == 2 && docName[1].equals("xlsx"))
+                downloadFile(file, new java.io.File(filePath + document.getFileName()));
+            else sendMessage(message.getChatId(), "Формат вашего файла: " + docName[1] + "\nПока что бот принимает только файлы .xlsx");
+
+        }catch (TelegramApiException e){
+            System.out.println(e.getMessage());
+        }
 
         sendMessage(message.getChatId(), "Файл принят, начало обработки...");
         try {
-            java.io.File file = new java.io.File(filePath);
-            excelFileReader = new ExcelFileReader(file); //Чтение excel-файла. Все должно происходить в конструкторе класса, а мы можем просто использовать все паблик функции для работы с файлом
+            java.io.File file = new java.io.File(filePath + document.getFileName());
 
-            sendMessage(message.getChatId(), "Файл обработан");
+            excelFileReader = new XLSXFileReader(file); //Чтение excel-файла. Все должно происходить в конструкторе класса, а мы можем просто использовать все паблик функции для работы с файлом
+
+            sendMessage(message.getChatId(), "Файл обработан. Рассылка: /notice");
+            setLastFile(filePath + document.getFileName());
         }catch (IOException e){sendMessage(message.getChatId(), "При обработке файла произошла ошибка: " + e.getMessage());}
 
         log.info("ChatID: " + message.getChatId() + " called /upload");
     }
-
     private void timetableCommandReceiver(long chatId){
 
         Optional<User> optionalUser = userRepository.findById(chatId);
@@ -305,7 +319,6 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         sendMessage(chatId, answer);
     }
-
     private void noticeCommandReceiver(){
         ArrayList<Integer> list = excelFileReader.getGroupIdList();
         Iterable<User> users = userRepository.findAll();
@@ -315,22 +328,35 @@ public class TelegramBot extends TelegramLongPollingBot {
 
             String timetable = findGroupTimetable(i);
 
-            Iterator<User> iterator = users.iterator();
-
-            while(iterator.hasNext()){
-                User user = iterator.next();
-                if(user.getGroupId() == i && user.isNotice()){
-                    sendMessage(user.getChatId(), "Ваше расписание на ближайший учебный день:\n" + timetable);
+            for (User user : users) {
+                if (user.getGroupId() == i && user.isNotice()) {
+                    sendMessage(user.getChatId(), "Ваше расписание на ближайший учебный день:\n\n" + timetable +
+                            "\nP.S. Учитывая немного неодинаковое заполнение расписания администрацией и очень раннюю стадию разработки бота, " +
+                            "очень советую перепровверять свое расписание ;)");
                 }
             }
         }
     }
-    private void customNoticeCommandReceiver(String message){
+    private void customNoticeCommandReceiver(ArrayList<String> messageList, boolean isOnlySub){
         Iterable<User> users = userRepository.findAll();
+        String message = "";
 
-        for (User user:
-             users) {
-            sendMessage(user.getChatId(), message);
+        for(String str : messageList){
+            message += str + " ";
+        }
+        message = message.trim();
+        if(isOnlySub) {
+            for (User user :
+                    users) {
+                if (user.isNotice())
+                    sendMessage(user.getChatId(), message);
+            }
+        }
+        else{
+            for (User user :
+                    users) {
+                sendMessage(user.getChatId(), message);
+            }
         }
     }
     private void autoNoticeCommandReceiver(long chatId){
@@ -347,14 +373,33 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         userRepository.save(user);
     }
+    private void feedbackCommandReceiver(Message message, ArrayList<String> feedback){
+        String feedbackFilePath = "/home/sasalomka/TimeTableFiles/feedback.txt";
+        try (FileWriter writer = new FileWriter(feedbackFilePath, true)){
+            Date date = new Date();
+            writer.write("Username: " + message.getChat().getUserName() + " ID: " + message.getChatId() + " Date: " + date.toString() + "--> ");
+            for(String str : feedback){
+                writer.write(str + " ");
+            }
+            writer.write("\n");
+            writer.flush();
+        }catch (IOException e){
+            System.out.println(e.getMessage());
+        }
 
-    /**
-     *
-     * Функция отвечает за отпраку сообщения юзеру
-     *
-     * @param chatId
-     * @param textToSend
-     */
+        sendMessage(message.getChatId(), "Спасибо за фидбек, еще можно написать мне в тг (подробности в /help)");
+    }
+    private void personalNoticeCommandReceiver(String chatId, ArrayList<String> messageList){
+        long l = Long.parseLong(chatId);
+        String message = "";
+
+        for(String str : messageList){
+            message += str + " ";
+        }
+        message = message.trim();
+
+        sendMessage(l, message);
+    }
     private void sendMessage(long chatId, String textToSend){
         SendMessage message = new SendMessage();
 
@@ -367,14 +412,12 @@ public class TelegramBot extends TelegramLongPollingBot {
             log.error("Error occured: " + e.getMessage());
         }
     }
-
     private int getRole(long chatId){
         Optional<User> optionalUser = userRepository.findById(chatId);
         User user = optionalUser.get();
 
         return user.getRole();
     }
-
     private String findGroupTimetable(int groupId){
 
         Map<Integer, String> groupTimetable = excelFileReader.getGroupTimetable(groupId);
@@ -395,9 +438,25 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
             answer += "\n";
         }
-
         return answer;
     }
-
-
+    private String checkLastFile(){
+        String path = "";
+        try(FileReader reader = new FileReader(lastFilePath)){
+            int buf;
+            while((buf = reader.read()) != -1){
+                path += (char)buf;
+            }
+        }catch (IOException e){
+            System.out.println(e.getMessage());
+        }
+        return path;
+    }
+    private void setLastFile(String fileName){
+        try(FileWriter writer = new FileWriter(lastFilePath)) {
+            writer.write(fileName);
+        }catch (IOException e){
+            System.out.println(e.getMessage());
+        }
+    }
 }
