@@ -7,17 +7,18 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.*;
+import org.telegram.telegrambots.meta.api.objects.File;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.krasilnikov.tgbots.polytech_timetamble_bot.config.BotConfig;
 import ru.krasilnikov.tgbots.polytech_timetamble_bot.excel.XLSXFileReader;
 import ru.krasilnikov.tgbots.polytech_timetamble_bot.model.User;
 import ru.krasilnikov.tgbots.polytech_timetamble_bot.model.UserRepository;
 
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.sql.Timestamp;
 import java.util.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @Component
 @Slf4j
@@ -26,12 +27,13 @@ public class TelegramBot extends TelegramLongPollingBot {
     XLSXFileReader excelFileReader;
     @Autowired
     private UserRepository userRepository;
-    final static String VERSION = "0.1.4";
+    final static String VERSION = "0.1.5";
     final static String SPECIAL_THANKS = "Отдельная благодарность: \n" +
             "@FTP0N1Y";
     final static String VERSION_TXT = "Данные об обновлениях:\n" +
             "\tТекущая версия бота: " + VERSION + "\n" +
             "Нововведения каждой версии:\n" +
+            "\t0.1.5: логи архивируются при достижении некоторого объема" +
             "\t0.1.4: добавление логов в бота\n" +
             "\t0.1.3: изменение способа хранения файлов, небольшой рефакторинг кода, расширение команд админа\n" +
             "\t0.1.2: добавление фидбека /feedback\n" +
@@ -473,9 +475,33 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
     private void logsUpdate(String log){
-        try(FileWriter writer = new FileWriter("/home/sasalomka/TimeTableFiles/logs.txt", true)){
+        try(FileWriter writer = new FileWriter("/home/sasalomka/TimeTableFiles/logs.txt", true);){
 
             writer.write(log + "\n");
+
+            java.io.File file = new java.io.File("/home/sasalomka/TimeTableFiles/logs.txt");
+
+            long fileInBytes = file.length();
+            long fileInKb = fileInBytes/1024;
+            long fileInMb = fileInKb/1024;
+
+            if(fileInMb > 100){
+                System.out.println("Должна начаться архивация файла");
+                try(ZipOutputStream zos = new ZipOutputStream(new FileOutputStream("/home/sasalomka/TimeTableFiles/zip_logs/" + new Date() + ".zip"));
+                    FileInputStream fis = new FileInputStream("/home/sasalomka/TimeTableFiles/logs.txt")){
+
+                    ZipEntry zipEntry = new ZipEntry(new Date().toString());
+                    zos.putNextEntry(zipEntry);
+
+                    byte[] buf = new byte[fis.available()];
+                    fis.read(buf);
+
+                    zos.write(buf);
+                    zos.closeEntry();
+
+                    file.delete();
+                }
+            }
 
         }catch (IOException e) {
             System.out.println(e.getMessage());
