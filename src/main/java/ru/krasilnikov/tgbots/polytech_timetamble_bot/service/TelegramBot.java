@@ -5,9 +5,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
+import org.telegram.telegrambots.meta.api.methods.send.SendDocument;
+import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.api.objects.File;
+import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
+import org.telegram.telegrambots.meta.api.objects.media.InputMediaDocument;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.krasilnikov.tgbots.polytech_timetamble_bot.config.BotConfig;
 import ru.krasilnikov.tgbots.polytech_timetamble_bot.excel.ExcelFileReader;
@@ -29,13 +33,14 @@ public class TelegramBot extends TelegramLongPollingBot {
     ExcelFileReader excelFileReader;
     @Autowired
     private UserRepository userRepository;
-    final static String VERSION = "0.1.6";
+    final static String VERSION = "0.1.7";
     final static String SPECIAL_THANKS = "Отдельная благодарность: \n" +
             "@FTP0N1Y";
     final static String VERSION_TXT = "Данные об обновлениях:\n" +
             "\tТекущая версия бота: " + VERSION + "\n" +
             "Нововведения каждой версии:\n" +
-            "\t0.1.6: Теперь бот принимает не только .xlsx файлы, но и .xls без лишний действий в виде конвертации в нужный формат\n" +
+            "\t0.1.7: вместе с расписанием группы присылается полное расписание на случай ошибок в чтении файла\n" +
+            "\t0.1.6: теперь бот принимает не только .xlsx файлы, но и .xls без лишний действий в виде конвертации в нужный формат\n" +
             "\t0.1.5: логи архивируются при достижении некоторого объема\n" +
             "\t0.1.4: добавление логов в бота\n" +
             "\t0.1.3: изменение способа хранения файлов, небольшой рефакторинг кода, расширение команд админа\n" +
@@ -70,10 +75,17 @@ public class TelegramBot extends TelegramLongPollingBot {
         this.config = config;
 
         try{
-            excelFileReader = new XLSXFileReader(new java.io.File(checkLastFile()));
+            String[] arrName = checkLastFile().split("\\.");
+            if(arrName[1].equals("xlsx"))
+                excelFileReader = new XLSXFileReader(new java.io.File(checkLastFile()));
+            else if(arrName[1].equals("xls"))
+                excelFileReader = new XLSFileReader(new java.io.File(checkLastFile()));
+            else System.out.println("Last file loading error");
+
         }catch (IOException e){
             System.out.println(e.getMessage());
         }
+
     }
     @Override
     public String getBotUsername() {
@@ -287,6 +299,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         String answer = findGroupTimetable(userGroup);
 
         sendMessage(chatId, answer);
+        sendFile(chatId, new java.io.File(checkLastFile()));
 
         logsUpdate(new Date() + "\tUser: " + chatId + " TIMETABLE COMMAND");
     }
@@ -362,6 +375,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                     sendMessage(user.getChatId(), "Ваше расписание на ближайший учебный день:\n\n" + timetable +
                             "\nP.S. Учитывая немного неодинаковое заполнение расписания администрацией и очень раннюю стадию разработки бота, " +
                             "очень советую перепровверять свое расписание ;)");
+                    sendFile(chatId, new java.io.File(checkLastFile()));
                 }
             }
         }
@@ -433,6 +447,22 @@ public class TelegramBot extends TelegramLongPollingBot {
             execute(message);
         }catch(TelegramApiException e){
             log.error("Error occured: " + e.getMessage());
+        }
+    }
+
+    private void sendFile(long chatId, java.io.File file){
+
+        Long longChatId = chatId;
+
+
+        InputFile inputFile = new InputFile(file);
+
+        SendDocument sendDocument = new SendDocument(longChatId.toString(), inputFile);
+
+        try{
+            execute(sendDocument);
+        }catch (TelegramApiException e){
+            System.out.println(e.getMessage());
         }
     }
     private int getRole(long chatId){
