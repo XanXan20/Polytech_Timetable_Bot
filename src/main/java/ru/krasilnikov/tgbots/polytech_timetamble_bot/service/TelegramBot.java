@@ -10,6 +10,8 @@ import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.api.objects.File;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.krasilnikov.tgbots.polytech_timetamble_bot.config.BotConfig;
+import ru.krasilnikov.tgbots.polytech_timetamble_bot.excel.ExcelFileReader;
+import ru.krasilnikov.tgbots.polytech_timetamble_bot.excel.XLSFileReader;
 import ru.krasilnikov.tgbots.polytech_timetamble_bot.excel.XLSXFileReader;
 import ru.krasilnikov.tgbots.polytech_timetamble_bot.model.User;
 import ru.krasilnikov.tgbots.polytech_timetamble_bot.model.UserRepository;
@@ -24,16 +26,17 @@ import java.util.zip.ZipOutputStream;
 @Slf4j
 public class TelegramBot extends TelegramLongPollingBot {
     private final String lastFilePath = "/home/sasalomka/TimeTableFiles/last_file.txt";
-    XLSXFileReader excelFileReader;
+    ExcelFileReader excelFileReader;
     @Autowired
     private UserRepository userRepository;
-    final static String VERSION = "0.1.5";
+    final static String VERSION = "0.1.6";
     final static String SPECIAL_THANKS = "Отдельная благодарность: \n" +
             "@FTP0N1Y";
     final static String VERSION_TXT = "Данные об обновлениях:\n" +
             "\tТекущая версия бота: " + VERSION + "\n" +
             "Нововведения каждой версии:\n" +
-            "\t0.1.5: логи архивируются при достижении некоторого объема" +
+            "\t0.1.6: Теперь бот принимает не только .xlsx файлы, но и .xls без лишний действий в виде конвертации в нужный формат\n" +
+            "\t0.1.5: логи архивируются при достижении некоторого объема\n" +
             "\t0.1.4: добавление логов в бота\n" +
             "\t0.1.3: изменение способа хранения файлов, небольшой рефакторинг кода, расширение команд админа\n" +
             "\t0.1.2: добавление фидбека /feedback\n" +
@@ -139,14 +142,14 @@ public class TelegramBot extends TelegramLongPollingBot {
                 case "/customnotice":
 
                     if(getRole(update.getMessage().getChatId()) == 2) {
-                        boolean isOnlySubs = false;
+                        boolean isOnlySubs = true;
                         ArrayList<String> message = new ArrayList<>();
                         for (int i = 2; i < messageText.length; i++) {
                             message.add(messageText[i]);
                         }
 
                         if(messageText[1].equalsIgnoreCase("y"))
-                            isOnlySubs = true;
+                            isOnlySubs = false;
 
                         customNoticeCommandReceiver(message, isOnlySubs, chatId);
                     } else{
@@ -199,7 +202,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             user.setRegisteredAt(new Timestamp(System.currentTimeMillis()));
 
             userRepository.save(user);
-            logsUpdate(new Date() + "\tUserId: " + chatId + " was registered");
+            logsUpdate(new Date() + "\tUser: " + chatId + " was registered");
         }
     }
     private void startCommandReceived(long chatId, String name){
@@ -301,7 +304,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         userRepository.save(user);
 
-        logsUpdate(new Date() + "\tUser: " + chatId + " AUTONOTICE COMMAND; SUNSCRIBER = " + user.isNotice());
+        logsUpdate(new Date() + "\tUser: " + chatId + " AUTONOTICE COMMAND; SUBSCRIBER = " + user.isNotice());
     }
     private void thanksCommandReceiver(long chatId){
         sendMessage(chatId, SPECIAL_THANKS);
@@ -313,14 +316,16 @@ public class TelegramBot extends TelegramLongPollingBot {
         GetFile getFile = new GetFile();
         getFile.setFileId(document.getFileId());
         String filePath = "/home/sasalomka/TimeTableFiles/";
+
+        String[] docName = new String[]{"name is empty"};
         try{
             File file = execute(getFile);
 
-            String[] docName = document.getFileName().split("\\.");
-            if(docName.length == 2 && docName[1].equals("xlsx"))
+            docName = document.getFileName().split("\\.");
+            if(docName.length == 2 && (docName[1].equals("xlsx") || docName[1].equals("xls")))
                 downloadFile(file, new java.io.File(filePath + document.getFileName()));
             else {
-                sendMessage(message.getChatId(), "Формат вашего файла: ." + docName[1] + "\nПока что бот принимает только файлы .xlsx");
+                sendMessage(message.getChatId(), "Формат вашего файла: ." + docName[1] + "\nБот принимает только файлы .xlsx и .xls");
                 return;
             }
 
@@ -332,7 +337,10 @@ public class TelegramBot extends TelegramLongPollingBot {
         try {
             java.io.File file = new java.io.File(filePath + document.getFileName());
 
-            excelFileReader = new XLSXFileReader(file); //Чтение excel-файла. Все должно происходить в конструкторе класса, а мы можем просто использовать все паблик функции для работы с файлом
+            if(docName[1].equals("xlsx"))
+                excelFileReader = new XLSXFileReader(file); //Чтение excel-файла. Все должно происходить в конструкторе класса, а мы можем просто использовать все паблик функции для работы с файлом
+            else if(docName[1].equals("xls"))
+                excelFileReader = new XLSFileReader(file);
 
             sendMessage(message.getChatId(), "Файл обработан. Рассылка: /notice");
             setLastFile(filePath + document.getFileName());

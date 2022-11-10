@@ -1,11 +1,13 @@
 package ru.krasilnikov.tgbots.polytech_timetamble_bot.excel;
 
+import org.apache.poi.hssf.usermodel.HSSFCell;
+import org.apache.poi.hssf.usermodel.HSSFRow;
+import org.apache.poi.hssf.usermodel.HSSFSheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.xssf.usermodel.XSSFCell;
 import org.apache.poi.xssf.usermodel.XSSFRow;
-import org.apache.poi.xssf.usermodel.XSSFSheet;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -15,19 +17,18 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-public class XLSXFileReader implements ExcelFileReader{
+public class XLSFileReader implements ExcelFileReader{
 
-    private final XSSFSheet sheet;
+    private final HSSFSheet sheet;
     private final Map<Integer, Integer> groupIdToGroupColumn;
     private final ArrayList<Integer> groupIdList;
 
-    public XLSXFileReader(File filePath) throws IOException{
-
+    public XLSFileReader(File filePath) throws IOException{
         FileInputStream fileInputStream = new FileInputStream(filePath);
-        XSSFWorkbook workbook = new XSSFWorkbook(fileInputStream);
+        HSSFWorkbook workbook = new HSSFWorkbook(fileInputStream);
         sheet = workbook.getSheet("Лист1");
 
-        XSSFRow row = sheet.getRow(3);
+        HSSFRow row = sheet.getRow(3);
 
         groupIdToGroupColumn = new HashMap<>();
         groupIdList = new ArrayList<>();
@@ -45,15 +46,13 @@ public class XLSXFileReader implements ExcelFileReader{
 
             groupIdList.add(cellValue);
             groupIdToGroupColumn.put(cellValue, cellColumn);
+
         }
-
-        //this.groupIdList = groupList;
-
         workbook.close();
     }
 
-    public Map<Integer, String> getGroupTimetable(int groupId){
-
+    @Override
+    public Map<Integer, String> getGroupTimetable(int groupId) {
         Map<Integer, String> groupTimetable = new HashMap<>();
 
         int groupColumn = groupIdToGroupColumn.get(groupId);
@@ -61,7 +60,7 @@ public class XLSXFileReader implements ExcelFileReader{
         int i = 4;
         int lastRow = 18;
         boolean isMonday = false;
-        XSSFRow startReadingRow = sheet.getRow(i);
+        HSSFRow startReadingRow = sheet.getRow(i);
 
         Iterator<Cell> cellIterator = startReadingRow.cellIterator();
         while(cellIterator.hasNext()){
@@ -80,8 +79,8 @@ public class XLSXFileReader implements ExcelFileReader{
             if(isMonday && i == 13)
                 i++;
 
-            XSSFRow row = sheet.getRow(i);
-            XSSFCell cell = row.getCell(groupColumn);
+            HSSFRow row = sheet.getRow(i);
+            HSSFCell cell = row.getCell(groupColumn);
 
             String lesionName = cell.getStringCellValue();
 
@@ -104,5 +103,4 @@ public class XLSXFileReader implements ExcelFileReader{
     public ArrayList<Integer> getGroupIdList() {
         return groupIdList;
     }
-
 }
