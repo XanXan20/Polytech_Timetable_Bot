@@ -31,12 +31,15 @@ public class TelegramBot extends TelegramLongPollingBot {
     WebTest webTest;
     @Autowired
     private UserRepository userRepository;
-    final static String VERSION = "0.1.8";
-    final static String SPECIAL_THANKS = "Отдельная благодарность: \n" +
-            "@FTP0N1Y";
+    final static String VERSION = "0.1.9";
+    final static String SPECIAL_THANKS = """
+            Отдельная благодарность:\s
+            @FTP0N1Y
+            @tiltmachinegun""";
     final static String VERSION_TXT = "Данные об обновлениях:\n" +
             "\tТекущая версия бота: " + VERSION + "\n" +
             "Нововведения каждой версии:\n" +
+            "\t0.1.9: перенос бота с FirefoxWebDriver на HtmlUtilDriver для оптимизации запросов \n" +
             "\t0.1.8: бот умеет проверять и загружать новое расписание с сайта, подробнее в /help \n" +
             "\t0.1.7: вместе с расписанием группы присылается полное расписание на случай ошибок в чтении файла\n" +
             "\t0.1.6: теперь бот принимает не только .xlsx файлы, но и .xls без лишний действий в виде конвертации в нужный формат\n" +
@@ -577,5 +580,6 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
         else
             sendMessage(chatId, "На данный момент загружено последнее доступное расписание");
+        logsUpdate(new Date() + "\tUser: " + chatId + " UPDATE COMMAND");
     }
 }
