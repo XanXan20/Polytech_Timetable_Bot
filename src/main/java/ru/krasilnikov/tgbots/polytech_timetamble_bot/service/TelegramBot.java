@@ -6,12 +6,9 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.send.SendDocument;
-import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.api.objects.File;
-import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
-import org.telegram.telegrambots.meta.api.objects.media.InputMediaDocument;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.krasilnikov.tgbots.polytech_timetamble_bot.config.BotConfig;
 import ru.krasilnikov.tgbots.polytech_timetamble_bot.excel.ExcelFileReader;
@@ -31,14 +28,16 @@ import java.util.zip.ZipOutputStream;
 public class TelegramBot extends TelegramLongPollingBot {
     private final String lastFilePath = "/home/sasalomka/TimeTableFiles/last_file.txt";
     ExcelFileReader excelFileReader;
+    WebTest webTest;
     @Autowired
     private UserRepository userRepository;
-    final static String VERSION = "0.1.7";
+    final static String VERSION = "0.1.8";
     final static String SPECIAL_THANKS = "Отдельная благодарность: \n" +
             "@FTP0N1Y";
     final static String VERSION_TXT = "Данные об обновлениях:\n" +
             "\tТекущая версия бота: " + VERSION + "\n" +
             "Нововведения каждой версии:\n" +
+            "\t0.1.8: бот умеет проверять и загружать новое расписание с сайта, подробнее в /help \n" +
             "\t0.1.7: вместе с расписанием группы присылается полное расписание на случай ошибок в чтении файла\n" +
             "\t0.1.6: теперь бот принимает не только .xlsx файлы, но и .xls без лишний действий в виде конвертации в нужный формат\n" +
             "\t0.1.5: логи архивируются при достижении некоторого объема\n" +
@@ -57,13 +56,16 @@ public class TelegramBot extends TelegramLongPollingBot {
             Внимание! Если бот вдруг не работает как надо, то возможно вас еще нет в базе. Чтобы зарегистрироваться, отправьте команду /start
 
             Доступные команды:
+            
             \t/help - список доступных команд
             \t/versions - информация о версиях бота
             \t/changegroup [номер_группы] (напр. /changegroup 71)- подписаться на уведомления по расписанию для вашей группы
             \t/mygroup - узнать свою текущую группу
             \t/myrole - узнать свою роль
             \t/timetable - узнать расписание своей группы
-            \t/feedback [ваши любые пожелания или опыт использования] - Опишите опыт использования ботом.\t/thanks
+            \t/feedback [ваши любые пожелания или опыт использования] - Опишите опыт использования ботом.
+            \t/thanks - благодарности
+            \t/update - проверить расписание на сайте. ВНИМАНИЕ функция экспериментальная, прошу использовать только если вы подписаны на обновления, а вам все еще не пришло расписание
 
             Бот хостится на моем компе, поэтому по очевидным причинам иногда будет недоступен, но если он будет уж очень всем полезен и нужен, то так и быть, раскошелюсь на сервер, только скажите
 
@@ -190,6 +192,12 @@ public class TelegramBot extends TelegramLongPollingBot {
                         sendMessage(update.getMessage().getChatId(), "Недостаточно прав");
                     }
                     break;
+
+                case "/update":
+
+                    checkNewTimetable(chatId);
+
+                    break;
                 default:
                     sendMessage(chatId, "Простите, эта команда неправильна, или не поддерживается.");
             }
@@ -299,7 +307,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         String answer = findGroupTimetable(userGroup);
 
         sendMessage(chatId, answer);
-        sendFile(chatId, new java.io.File(checkLastFile()));
+        sendFile(chatId, excelFileReader.getFile());
 
         logsUpdate(new Date() + "\tUser: " + chatId + " TIMETABLE COMMAND");
     }
@@ -369,13 +377,13 @@ public class TelegramBot extends TelegramLongPollingBot {
              list) {
 
             String timetable = findGroupTimetable(i);
-
             for (User user : users) {
                 if (user.getGroupId() == i && user.isNotice()) {
+
                     sendMessage(user.getChatId(), "Ваше расписание на ближайший учебный день:\n\n" + timetable +
                             "\nP.S. Учитывая немного неодинаковое заполнение расписания администрацией и очень раннюю стадию разработки бота, " +
                             "очень советую перепровверять свое расписание ;)");
-                    sendFile(chatId, new java.io.File(checkLastFile()));
+                    sendFile(user.getChatId(), new java.io.File(checkLastFile()));
                 }
             }
         }
@@ -449,16 +457,13 @@ public class TelegramBot extends TelegramLongPollingBot {
             log.error("Error occured: " + e.getMessage());
         }
     }
-
     private void sendFile(long chatId, java.io.File file){
 
         Long longChatId = chatId;
 
-
         InputFile inputFile = new InputFile(file);
 
         SendDocument sendDocument = new SendDocument(longChatId.toString(), inputFile);
-
         try{
             execute(sendDocument);
         }catch (TelegramApiException e){
@@ -544,5 +549,33 @@ public class TelegramBot extends TelegramLongPollingBot {
         }catch (IOException e) {
             System.out.println(e.getMessage());
         }
+    }
+    private void checkNewTimetable(long chatId){
+        sendMessage(chatId, "Проверка обновлений на сайте, пожалуйста подождите...");
+
+        webTest = new WebTest();
+        String fileName = webTest.checkSite(checkLastFile());
+        String filePath = "/home/sasalomka/TimeTableFiles/";
+
+        if(!(filePath + fileName).equals(checkLastFile())){
+
+            String[] nameWords = fileName.split("\\.");
+            try {
+                if (nameWords[1].equals("xlsx")) {
+                    excelFileReader = new XLSXFileReader(new java.io.File(filePath + fileName));
+                }
+                else if(nameWords[1].equals("xls")) {
+                    excelFileReader = new XLSFileReader(new java.io.File(filePath + fileName));
+                }
+            }catch (IOException e){
+                System.out.println(e.getMessage());
+            }
+
+            setLastFile(filePath + fileName);
+            sendMessage(chatId, "Расписание обновлено");
+            noticeCommandReceiver(chatId);
+        }
+        else
+            sendMessage(chatId, "На данный момент загружено последнее доступное расписание");
     }
 }

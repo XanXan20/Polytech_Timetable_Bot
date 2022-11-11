@@ -6,8 +6,6 @@ import org.apache.poi.hssf.usermodel.HSSFSheet;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
-import org.apache.poi.xssf.usermodel.XSSFCell;
-import org.apache.poi.xssf.usermodel.XSSFRow;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -17,13 +15,15 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-public class XLSFileReader implements ExcelFileReader{
+public class XLSFileReader extends ExcelFileReader{
 
     private final HSSFSheet sheet;
+    private File file;
     private final Map<Integer, Integer> groupIdToGroupColumn;
     private final ArrayList<Integer> groupIdList;
 
     public XLSFileReader(File filePath) throws IOException{
+        this.file = filePath;
         FileInputStream fileInputStream = new FileInputStream(filePath);
         HSSFWorkbook workbook = new HSSFWorkbook(fileInputStream);
         sheet = workbook.getSheet("Лист1");
@@ -102,5 +102,8 @@ public class XLSFileReader implements ExcelFileReader{
 
     public ArrayList<Integer> getGroupIdList() {
         return groupIdList;
+    }
+    public File getFile(){
+        return this.file;
     }
 }

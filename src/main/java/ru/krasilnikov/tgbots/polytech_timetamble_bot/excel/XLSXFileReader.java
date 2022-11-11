@@ -15,14 +15,15 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-public class XLSXFileReader implements ExcelFileReader{
+public class XLSXFileReader extends ExcelFileReader{
 
     private final XSSFSheet sheet;
+    private File file;
     private final Map<Integer, Integer> groupIdToGroupColumn;
     private final ArrayList<Integer> groupIdList;
 
     public XLSXFileReader(File filePath) throws IOException{
-
+        this.file = filePath;
         FileInputStream fileInputStream = new FileInputStream(filePath);
         XSSFWorkbook workbook = new XSSFWorkbook(fileInputStream);
         sheet = workbook.getSheet("Лист1");
@@ -103,6 +104,9 @@ public class XLSXFileReader implements ExcelFileReader{
 
     public ArrayList<Integer> getGroupIdList() {
         return groupIdList;
+    }
+    public File getFile(){
+        return this.file;
     }
 
 }
