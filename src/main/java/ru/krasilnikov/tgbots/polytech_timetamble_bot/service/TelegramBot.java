@@ -2,6 +2,7 @@ package ru.krasilnikov.tgbots.polytech_timetamble_bot.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
@@ -26,7 +27,15 @@ import java.util.zip.ZipOutputStream;
 @Component
 @Slf4j
 public class TelegramBot extends TelegramLongPollingBot {
-    private final String lastFilePath = "/home/sasalomka/TimeTableFiles/last_file.txt";
+    @Value("${dataFolderPath}")
+    String dataFolderPath;
+    @Value("${logsFilePath}")
+    String logsFilePath;
+    String lastFilePath = "C:\\Users\\Sasalomka\\Documents\\GitHub\\Polytech_Timetable_Bot\\data\\last_file.txt";
+    @Value("${feedbackFilePath}")
+    String feedbackFilePath;
+    @Value("${zipLogsFolderPath}")
+    String zipLogsFolderPath;
     ExcelFileReader excelFileReader;
     WebTest webTest;
     @Autowired
@@ -339,7 +348,8 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         GetFile getFile = new GetFile();
         getFile.setFileId(document.getFileId());
-        String filePath = "/home/sasalomka/TimeTableFiles/";
+
+        String filePath = dataFolderPath;
 
         String[] docName = new String[]{"name is empty"};
         try{
@@ -418,8 +428,8 @@ public class TelegramBot extends TelegramLongPollingBot {
         logsUpdate(new Date() + "\tUser: " + chatId + " CUSTOMNOTICE COMMAND;\n\tNOTICE TEXT: " + message);
     }
     private void feedbackCommandReceiver(Message message, ArrayList<String> feedback){
-        String feedbackFilePath = "/home/sasalomka/TimeTableFiles/feedback.txt";
-        try (FileWriter writer = new FileWriter(feedbackFilePath, true)){
+        String feedbackFile = feedbackFilePath;
+        try (FileWriter writer = new FileWriter(feedbackFile, true)){
             Date date = new Date();
             writer.write("Username: " + message.getChat().getUserName() + " ID: " + message.getChatId() + " Date: " + date + "--> ");
             for(String str : feedback){
@@ -521,11 +531,11 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
     private void logsUpdate(String log){
-        try(FileWriter writer = new FileWriter("/home/sasalomka/TimeTableFiles/logs.txt", true);){
+        try(FileWriter writer = new FileWriter(logsFilePath, true);){
 
             writer.write(log + "\n");
 
-            java.io.File file = new java.io.File("/home/sasalomka/TimeTableFiles/logs.txt");
+            java.io.File file = new java.io.File(logsFilePath);
 
             long fileInBytes = file.length();
             long fileInKb = fileInBytes/1024;
@@ -533,8 +543,8 @@ public class TelegramBot extends TelegramLongPollingBot {
 
             if(fileInMb > 100){
                 System.out.println("Должна начаться архивация файла");
-                try(ZipOutputStream zos = new ZipOutputStream(new FileOutputStream("/home/sasalomka/TimeTableFiles/zip_logs/" + new Date() + ".zip"));
-                    FileInputStream fis = new FileInputStream("/home/sasalomka/TimeTableFiles/logs.txt")){
+                try(ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zipLogsFolderPath + new Date() + ".zip"));
+                    FileInputStream fis = new FileInputStream(logsFilePath)){
 
                     ZipEntry zipEntry = new ZipEntry(new Date().toString());
                     zos.putNextEntry(zipEntry);
@@ -558,7 +568,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         webTest = new WebTest();
         String fileName = webTest.checkSite(checkLastFile());
-        String filePath = "/home/sasalomka/TimeTableFiles/";
+        String filePath = dataFolderPath;
 
         if(!(filePath + fileName).equals(checkLastFile())){
 

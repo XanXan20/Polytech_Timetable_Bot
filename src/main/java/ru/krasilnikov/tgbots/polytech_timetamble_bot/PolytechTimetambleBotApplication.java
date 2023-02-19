@@ -7,7 +7,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class PolytechTimetambleBotApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(PolytechTimetambleBotApplication.class, args);
+        try{
+            SpringApplication.run(PolytechTimetambleBotApplication.class, args);
+            System.out.println("Проект запущен");
+        }catch (Exception e){
+            e.printStackTrace();
+        }
     }
 
 }
